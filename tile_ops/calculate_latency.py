@@ -2,7 +2,7 @@ import time
 import requests
 import argparse
 
-def calculate_total_time(url, headers, run_number):
+def calculate_total_time(url, headers, run_number, output_file):
     total_start = time.time()
 
     response = requests.get(url, headers=headers)
@@ -10,8 +10,10 @@ def calculate_total_time(url, headers, run_number):
     total_end = time.time()
     total_time = total_end - total_start
 
-    # Print the total time for this specific run
-    print(f"Run {run_number}: {total_time * 1000:.2f} milliseconds")
+    # Print and write the total time for this specific run
+    output_message = f"Run {run_number}: {total_time * 1000:.2f} milliseconds\n"
+    print(output_message)
+    output_file.write(output_message)
 
     return total_time, response.status_code, response.text
 
@@ -32,16 +34,23 @@ def main():
     total_times = []
     status_code = None
 
-    for i in range(1, args.runs + 1):
-        total_time, status_code, response_text = calculate_total_time(args.url, headers, i)
-        total_times.append(total_time)
+    # Open the output file
+    with open("latency.out", "w") as output_file:
+        for i in range(1, args.runs + 1):
+            total_time, status_code, response_text = calculate_total_time(args.url, headers, i, output_file)
+            total_times.append(total_time)
 
-    average_time = sum(total_times) / len(total_times)
+        average_time = sum(total_times) / len(total_times)
 
-    print("\nSummary:")
-    print(f"Ran the request {args.runs} times.")
-    print(f"Average Total Time: {average_time * 1000:.2f} milliseconds")
-    print(f"Status Code: {status_code}")
+        summary_message = (
+            "\nSummary:\n"
+            f"Ran the request {args.runs} times.\n"
+            f"Average Total Time: {average_time * 1000:.2f} milliseconds\n"
+            f"Status Code: {status_code}\n"
+        )
+
+        print(summary_message)
+        output_file.write(summary_message)
 
 if __name__ == "__main__":
     main()

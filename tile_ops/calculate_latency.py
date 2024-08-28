@@ -1,45 +1,25 @@
 import time
 import requests
 import argparse
-import socket
-import ssl
-import urllib3
 
-def calculate_latency(url, headers):
-    http = urllib3.PoolManager()
+def calculate_total_time(url, headers, run_number):
     total_start = time.time()
 
-    dns_start = time.time()
-    parsed_url = urllib3.util.parse_url(url)
-    addr_info = socket.getaddrinfo(parsed_url.host, parsed_url.port or 443)
-    dns_end = time.time()
-    dns_time = dns_end - dns_start
-
-    conn_start = dns_end
-    conn = http.connection_from_url(url)
-    conn.request('GET', url, headers=headers)
-    conn_end = time.time()
-    conn_time = conn_end - conn_start
-
-    ttfb_start = conn_end
-    response = conn.urlopen('GET', url, headers=headers, preload_content=False)
-    ttfb_end = time.time()
-    ttfb_time = ttfb_end - ttfb_start
-
-    content_start = ttfb_end
-    content = response.read()
-    content_end = time.time()
-    content_time = content_end - content_start
+    response = requests.get(url, headers=headers)
 
     total_end = time.time()
     total_time = total_end - total_start
 
-    return dns_time, conn_time, ttfb_time, content_time, total_time, response.status, content.decode('utf-8')
+    # Print the total time for this specific run
+    print(f"Run {run_number}: {total_time * 1000:.2f} milliseconds")
+
+    return total_time, response.status_code, response.text
 
 def main():
-    parser = argparse.ArgumentParser(description="Calculate various latency metrics of a given HTTP request.")
+    parser = argparse.ArgumentParser(description="Calculate the average latency of a given HTTP request over multiple runs.")
     parser.add_argument("url", type=str, help="The URL to send the request to.")
     parser.add_argument("--header", action="append", help="HTTP headers to include in the request, in 'Key: Value' format.")
+    parser.add_argument("--runs", type=int, default=5, help="Number of times to run the request to calculate the average latency.")
 
     args = parser.parse_args()
 
@@ -49,15 +29,19 @@ def main():
             key, value = header.split(":", 1)
             headers[key.strip()] = value.strip()
 
-    dns_time, conn_time, ttfb_time, content_time, total_time, status_code, response_text = calculate_latency(args.url, headers)
+    total_times = []
+    status_code = None
 
-    print(f"DNS Resolution Time: {dns_time:.4f} seconds")
-    print(f"Connection Time: {conn_time:.4f} seconds")
-    print(f"Time to First Byte (TTFB): {ttfb_time:.4f} seconds")
-    print(f"Content Download Time: {content_time:.4f} seconds")
-    print(f"Total Time: {total_time:.4f} seconds")
+    for i in range(1, args.runs + 1):
+        total_time, status_code, response_text = calculate_total_time(args.url, headers, i)
+        total_times.append(total_time)
+
+    average_time = sum(total_times) / len(total_times)
+
+    print("\nSummary:")
+    print(f"Ran the request {args.runs} times.")
+    print(f"Average Total Time: {average_time * 1000:.2f} milliseconds")
     print(f"Status Code: {status_code}")
-    print(f"Response Text: {response_text}")
 
 if __name__ == "__main__":
     main()
